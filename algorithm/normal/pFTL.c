@@ -24,7 +24,7 @@ void pFTL_init(){
     _section_validation_table = (bool*)malloc(sizeof(bool)*_NOS);
     
     pftl_buffer.lpas = (KEYT*)malloc(sizeof(KEYT)*L2PGAP);
-    pftl_buffer.data_set = inf_get_valueset(NULL,FS_BUSE_W,PAGESIZE*L2PGAP);
+    pftl_buffer.data_set = inf_get_valueset(NULL,FS_BUSE_W,PAGESIZE);
 
    
     //printf("%u", _usable_section);
@@ -34,7 +34,7 @@ void pFTL_init(){
     memset((void*)_section_validation_table, 0, sizeof(bool)*_NOS);
 
     pthread_t GC_thread;
-    pthread_create(&GC_thread, NULL, GC, NULL);
+    //pthread_create(&GC_thread, NULL, GC, NULL);
     printf("%u %u %u\n", _usable_section, _L2P_table, _P2L_table);
 }
 
@@ -43,17 +43,21 @@ KEYT get_key(KEYT lpa){
 }
 
 void* GC(void* qwer){
-    printf("initialize GC thread\n");
-    while(true){
-        if(_usable_section==1){
-            printf("start GC!\n");
-            request* read_request = (request*)malloc(sizeof(request)),
-                    *write_request = (request*)malloc(sizeof(request));
-            normal_params* read_param = (normal_params*)malloc(sizeof(normal_params));
+    //printf("initialize GC thread\n");
+    //while(true){
+        if(_usable_section==3){
+            
             while (!done_GC()){
+                //printf("start GC!\n");
+                request* read_request = NULL, *write_request = NULL;
+                normal_params* read_param = NULL;
+                read_request = (request*)malloc(sizeof(request));
+                write_request = (request*)malloc(sizeof(request));
+                read_param = (normal_params*)malloc(sizeof(normal_params));
+
                 KEYT gc_target_section = get_GC_target();
-                KEYT empty_section = get_empty_section();
-                printf("GC target : %u empty section : %u \n", gc_target_section/_PPS,empty_section/_PPS);
+                KEYT empty_section = _log/_PPS;
+                //printf("GC target : %u empty section : %u \n", gc_target_section/_PPS,empty_section);
                 read_param->done = false;
                 read_request->value = inf_get_valueset(NULL, FS_MALLOC_R, PAGESIZE);
                 read_request->param = (void*)read_param;
@@ -66,7 +70,7 @@ void* GC(void* qwer){
                 write_request->end_req = GC_end_req;
 
 
-
+                int cnt=0;
                 for(int i=0; i<_PPS; i++){
                     read_request->key = gc_target_section+i;
                     normal_get(read_request);
@@ -76,28 +80,33 @@ void* GC(void* qwer){
                     for(int pidx=0; pidx<L2PGAP; pidx++){
                         KEYT ppa = ((gc_target_section+i)<<2) | pidx;
                         KEYT lpa = _P2L_table[ppa];
-                        if(!_validation_table[ppa]) continue;
+                        if(!_validation_table[ppa]){
+                            cnt++;
+                            continue;
+                        }
                         write_request->key = lpa;
-                        memcpy((void*)write_request->value, read_request->value+(LPAGESIZE*pidx), LPAGESIZE);
+                        memcpy((void*)write_request->value, (void*)(read_request->value+(LPAGESIZE*pidx)), 1);
                         write(write_request);
                         _validation_table[ppa] = false;
                     }
                     read_param->done=false;
                 }
-                __normal.li->trim_a_block(gc_target_section);
+                //printf("trim!!!!!!!!!!!!!!!!\n");
+                __normal.li->trim_block(gc_target_section);
+
                 _section_validation_table[gc_target_section/_PPS]=false;
                 _usable_section++;
 
-                
-                        
-            }
-            free(read_param);
+                free(read_param);
             free(read_request);
             free(write_request);
+            }
+            //printf("Done GC!\n");
+            
 
         }
         
-    }
+    //}
     
 }
 /*
@@ -119,7 +128,8 @@ void wait_for_request(request* const req){
 inline void log_up(){
     _log++;
     if(!(_log%_PPS)){
-        if(_section_validation_table[(int)_log/_PPS]){
+        if(_section_validation_table[(int)_log/_PPS] || ((int)_log/_PPS)==_NOS){
+            //printf("check!!!!\n");
             _log=get_empty_section();
         }
     }    
@@ -140,31 +150,34 @@ KEYT get_empty_section(){
 KEYT get_GC_target(){
     uint32_t max=0, id=UINT32_MAX;
     for(int i=0; i<_NOS; i++){
-        if(_section_validation_table[i]){
-            u_int32_t size = _PPS;
-            for(int j=i*_PPS; j<(i+1)*_PPS; j++){
+        if(_section_validation_table[i] && (i!=(int)_log/_PPS )){
+            u_int32_t size = _PPS*L2PGAP;
+            for(int j=i*_PPS*L2PGAP; j<(i+1)*_PPS*L2PGAP; j++){
                 size -= _validation_table[j];
             }
             if(max<size){
                 max = size;
                 id = i*_PPS;
             }
+            //printf("Section %d, dummy size : %u\n", i, size);
         }
+
         
     }
-    printf("Max dummy block : %u\n", max);
+    //printf("Max dummy block : %u\n", max);
     if(id == UINT32_MAX){printf("No GC Target!!!!\n"); abort();}
     return id;
 }
 
 bool done_GC(){
     for(int i=0; i<_NOS; i++){
-        //printf("%d %u\n", i, _section_info_table[i].dead_block_list.size);
-        if(_section_validation_table[i]){
-            u_int32_t size = _PPS;
-            for(int j=i*_PPS; j<(i+1)*_PPS; j++){
+        
+        if(_section_validation_table[i] && (i!=(int)_log/_PPS )){
+            u_int32_t size = _PPS*L2PGAP;
+            for(int j=i*_PPS*L2PGAP; j<(i+1)*_PPS*L2PGAP; j++){
                 size -= _validation_table[j];
             }
+            //printf("%d %u\n", i, size);
             if(size) return false;
         }
     }
@@ -172,7 +185,7 @@ bool done_GC(){
 }
 
 void write(request* const req){
-    //printf("%u\n" ,_usable_section);
+    //printf("LOG : %u\n" ,_log);
     
     KEYT lpa = req->key;
     KEYT ppa = (_log<<L2P_offset) | pftl_buffer.buffer_count;
@@ -183,12 +196,13 @@ void write(request* const req){
     _P2L_table[ppa] = lpa;
     if(temp!=UINT32_MAX){
         //KEYT garbage_block_section = (u_int32_t)((temp>>2)/_PPS);
-        // /printf("section : %u  garbage section : %u temp : %u\n", section_n, garbage_block_section, _usable_section);
-        _validation_table[temp] = false;
+        //printf("section : %u  temp : %u\n", section_n,  _usable_section);
+        if(req->type!=GCDW) _validation_table[temp] = false;
         
     }
+    //printf("%u", sizeof(req->value));
 	pftl_buffer.lpas[pftl_buffer.buffer_count] = lpa;
-	memcpy((void*)pftl_buffer.data_set + LPAGESIZE*pftl_buffer.buffer_count, (void*)req->value, sizeof(req->value));
+	memcpy((void*)pftl_buffer.data_set + LPAGESIZE*pftl_buffer.buffer_count, (void*)req->value, 8);
 	pftl_buffer.ppa=_log;
     pftl_buffer.buffer_count++;
 	//printf("Write Logical : %u Physical : %u\n", req->key, ppa>>2);
@@ -205,6 +219,7 @@ void write(request* const req){
 		my_req->end_req=normal_end_req;
 		my_req->type=DATAW;
 		my_req->param=(void*)params;
+        _validation_table[ppa] = true;
 		__normal.li->write(pftl_buffer.ppa,PAGESIZE, pftl_buffer.data_set,my_req);
 		pftl_buffer.buffer_count=0;
         log_up();
@@ -219,11 +234,11 @@ bool GC_end_req(request* input){
     normal_params* params=(normal_params*)input->param;
     switch(input->type){
         case GCDR:
-            printf("GC end req type %d, %d\n", input->type,params->done);
+            //printf("GC end req type %d, %d\n", input->type,params->done);
             params->done = true;
             break;
         case GCDW:
-            printf("GC end req type %d,\n", input->type);
+            //printf("GC end req type %d,\n", input->type);
             break;
     }
     //((normal_params*)(input->param))->done = true;

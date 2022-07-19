@@ -67,6 +67,7 @@ uint32_t normal_get(request *const req){
 	return 1;
 }
 uint32_t normal_set(request *const req){
+	GC(NULL);
 	write(req);
 
 
