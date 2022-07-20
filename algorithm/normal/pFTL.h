@@ -20,6 +20,8 @@ typedef struct section_info{
     list_t dead_block_list;
 }section_info_t;
 
+
+
 void pFTL_init();
 KEYT get_key(KEYT lpa);
 void* GC(void*);
@@ -32,4 +34,5 @@ inline void log_up();
 KEYT get_empty_section();
 void write(request* const req);
 bool GC_end_req(request* input);
+void wait_for_gc();
 #endif

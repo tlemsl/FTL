@@ -8,6 +8,7 @@
 #define LOWERTYPE 10
 
 extern MeasureTime mt;
+extern pthread_mutex_t GC_lock;
 
 struct algorithm __normal={
 	.argument_set=NULL,
@@ -57,7 +58,7 @@ uint32_t normal_get(request *const req){
 		break;
 	
 	default:
-		printf("Read Logical : %u physical : %u\n ", req->key, get_key(req->key)>>2);
+		//printf("Read Logical : %u physical : %u\n ", req->key, get_key(req->key)>>2);
 		__normal.li->read(get_key(req->key)>>2,PAGESIZE,req->value, my_req);	
 		break;
 	}
@@ -67,12 +68,16 @@ uint32_t normal_get(request *const req){
 	return 1;
 }
 uint32_t normal_set(request *const req){
-	GC(NULL);
+	//GC(NULL);
+	pthread_mutex_lock(&GC_lock);
 	write(req);
+	//wait_for_gc();
 
 
 	//__normal.li->write(req->key ,PAGESIZE,req->value,req->isAsync,my_req);
 	//__normal.li->write(get_key(req->key, DATAW, 0),PAGESIZE,req->value,my_req);
+	pthread_mutex_unlock(&GC_lock);
+	wait_for_gc();
 	return 0;
 }
 uint32_t normal_remove(request *const req){
@@ -87,10 +92,12 @@ void *normal_end_req(algo_req* input){
 	//int cnt=0;
 	request *res=input->parents;
 	//printf("call %u\n", res->key);
-
+	if(res->type != GCDW){
+		free(params);
+	}
 	res->end_req(res);
 
-	free(params);
+	
 	free(input);
 	return NULL;
 }

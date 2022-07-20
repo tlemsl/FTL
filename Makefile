@@ -18,7 +18,7 @@ DEBUGFLAGS=\
 			-Wno-pointer-arith\
 			-g\
 			-export-dynamic\
-#-fsanitize=address\
+#			-fsanitize=address\
 
 export COMMONFLAGS+=\
 			-Wno-write-strings\
