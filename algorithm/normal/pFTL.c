@@ -18,7 +18,7 @@ static bool _GC_flag;
 pthread_mutex_t GC_lock;
 // Validation Parameters
 static uint32_t _user_write_reqest, _lower_write_request_cnt;
-
+static struct mastersegment* GC_reserve_segment;
 
 
 void pFTL_init(){
@@ -41,8 +41,14 @@ void pFTL_init(){
 
     pthread_t GC_thread;
     pthread_mutex_init(&GC_lock, NULL);
-    pthread_create(&GC_thread, NULL, GC, NULL);
-    printf("%u %u %u\n", _usable_section, _L2P_table, _P2L_table);
+    GC_reserve_segment = __normal.bm->get_segment(__normal.bm, BLOCK_ACTIVE);
+    printf("%u!!!!!!\n\n\n", GC_reserve_segment->seg_idx);
+    printf("%u!!!!!!\n\n\n", __normal.bm->get_page_addr(GC_reserve_segment));
+    printf("%u!!!!!!\n\n\n", __normal.bm->get_page_addr(GC_reserve_segment));
+    printf("%u!!!!!!\n\n\n", __normal.bm->get_page_addr(GC_reserve_segment));
+    _log = _PPS;
+    //pthread_create(&GC_thread, NULL, GC, NULL);
+
 }
 
 KEYT get_key(KEYT lpa){
@@ -51,9 +57,9 @@ KEYT get_key(KEYT lpa){
 
 void* GC(void* qwer){
     //printf("initialize GC thread\n");
-    while(true){
+    //while(true){
         
-        if(_usable_section==3){
+        if(_usable_section==1){
             
             while (!done_GC()){
                 _GC_flag = true;
@@ -101,12 +107,12 @@ void* GC(void* qwer){
                         
                         write_request->key = lpa;
                         //memcpy((void*)write_request->value, (void*)(read_request->value+(LPAGESIZE*pidx)), 1);
-                        pthread_mutex_lock(&GC_lock);
+                        //pthread_mutex_lock(&GC_lock);
                         write(write_request);
                         wait_for_request(write_request);
                         _validation_table[ppa] = false;
                         write_param->done = false;
-                        pthread_mutex_unlock(&GC_lock);
+                        //pthread_mutex_unlock(&GC_lock);
                     }
                     read_param->done=false;
                 }
@@ -129,7 +135,7 @@ void* GC(void* qwer){
        
 
         
-    }
+    //}
     
 }
 /*
@@ -228,7 +234,7 @@ void write(request* const req){
     //printf("%d %d\n", (void*)pftl_buffer.data_set, (void*)pftl_buffer.data_set + LPAGESIZE*pftl_buffer.buffer_count);
     
 	pftl_buffer.lpas[pftl_buffer.buffer_count] = lpa;
-	//memcpy((void*)pftl_buffer.data_set + LPAGESIZE*pftl_buffer.buffer_count, (void*)req->value, LPAGESIZE);
+	//memcpy(&pftl_buffer.data_set[LPAGESIZE*pftl_buffer.buffer_count], (void*)req->value->value, LPAGESIZE);
 	pftl_buffer.ppa=_log;
     pftl_buffer.buffer_count++;
 	//printf("Write Logical : %u Physical : %u\n", req->key, ppa>>2);
@@ -244,6 +250,7 @@ void write(request* const req){
 		my_req->parents=req;
 		my_req->end_req=normal_end_req;
 		my_req->type=DATAW;
+        if(req->type == GCDW) my_req->type = GCDW;
 		my_req->param=(void*)params;
         _validation_table[ppa] = true;
 		__normal.li->write(pftl_buffer.ppa,PAGESIZE, pftl_buffer.data_set,my_req);

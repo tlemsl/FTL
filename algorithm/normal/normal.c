@@ -54,6 +54,7 @@ uint32_t normal_get(request *const req){
 	my_req->type=DATAR;
 	switch (req->type){
 	case GCDR:
+		my_req->type=GCDR;
 		__normal.li->read(req->key,PAGESIZE,req->value, my_req);
 		break;
 	
@@ -68,16 +69,16 @@ uint32_t normal_get(request *const req){
 	return 1;
 }
 uint32_t normal_set(request *const req){
-	//GC(NULL);
-	pthread_mutex_lock(&GC_lock);
+	GC(NULL);
+	//pthread_mutex_lock(&GC_lock);
 	write(req);
 	//wait_for_gc();
 
 
 	//__normal.li->write(req->key ,PAGESIZE,req->value,req->isAsync,my_req);
 	//__normal.li->write(get_key(req->key, DATAW, 0),PAGESIZE,req->value,my_req);
-	pthread_mutex_unlock(&GC_lock);
-	wait_for_gc();
+	//pthread_mutex_unlock(&GC_lock);
+	//wait_for_gc();
 	return 0;
 }
 uint32_t normal_remove(request *const req){

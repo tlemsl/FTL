@@ -263,23 +263,41 @@ enum{
 
 struct blockmanager{
 	uint32_t type;
+	//Require block get
 	__segment* (*get_segment)		(struct blockmanager*, uint32_t type);
+	//get remaining block not pop (queue)
 	__segment* (*pick_segment)		(struct blockmanager *, uint32_t seg_idx, uint32_t type); //used for load
+	// remove
 	int32_t (*get_page_addr)			(__segment*); 
+	
 	int32_t (*pick_page_addr)		(__segment*);
+	// Check segment
 	bool (*check_full)				(__segment*);
+	// true -> GC
 	bool (*is_gc_needed)			(struct blockmanager*);
+	// GC block get
 	__gsegment* (*get_gc_target)	(struct blockmanager*);
+	
+	//Remove block
 	void (*trim_segment)			(struct blockmanager*, __gsegment*);
 
+	// Check Valid(4K)
 	int (*bit_set)		(struct blockmanager*, uint32_t piece_ppa);
+	// invalid
 	int (*bit_unset)	(struct blockmanager*, uint32_t piece_ppa);
+	// Check page valid(4K data)
 	bool (*bit_query)		(struct blockmanager *, uint32_t piece_ppa);
+	// Reverse Query
 	bool (*is_invalid_piece) (struct blockmanager *, uint32_t piece_ppa);
 
+	// Set LBA data : lbas 
 	void (*set_oob) (struct blockmanager *, char* data, int len, uint32_t ppa);
+	
 	char *(*get_oob)(struct blockmanager *, uint32_t ppa);
+	
 	void (*change_reserve_to_active)(struct blockmanager *, __segment *reserve);
+	
+	
 	void (*insert_gc_target)(struct blockmanager *, uint32_t seg_idx);
 	uint32_t (*total_free_page_num)(struct blockmanager *, __segment *active); 
 	uint32_t (*seg_invalidate_piece_num)(struct blockmanager *, uint32_t seg_idx);
