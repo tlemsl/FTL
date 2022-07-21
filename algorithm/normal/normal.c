@@ -11,12 +11,18 @@ extern MeasureTime mt;
 extern pthread_mutex_t GC_lock;
 
 struct algorithm __normal={
-	.argument_set=NULL,
-	.create=normal_create,
-	.destroy=normal_destroy,
-	.read=normal_get,
-	.write=normal_set,
-	.remove=normal_remove
+        .argument_set = NULL,
+        .create = normal_create,
+        .destroy = normal_destroy,
+        .read = normal_get,
+        .write = normal_set,
+        .flush = NULL,
+        .remove=normal_remove,
+        .test = NULL,
+        .print_log = NULL,
+        .empty_cache = NULL,
+        .dump_prepare=NULL,
+        .dump = NULL
 };
 
 n_cdf _cdf[LOWERTYPE];
