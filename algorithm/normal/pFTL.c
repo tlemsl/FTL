@@ -94,7 +94,7 @@ void* GC(void* qwer){
                 //memcpy((void*)write_request->value, (void*)(read_request->value+(LPAGESIZE*pidx)), 1);
                 //pthread_mutex_lock(&GC_lock);
                 write(write_request);
-                wait_for_request(write_request);
+//                wait_for_request(write_request);
                 __normal.bm->bit_unset(__normal.bm, piece_ppa);
                 
                 write_param->done = false;
@@ -114,7 +114,7 @@ void* GC(void* qwer){
         free(write_request);
     
     _GC_flag = false;
-    printf("Done GC!\n");
+//    printf("Done GC!\n");
         
 
     }

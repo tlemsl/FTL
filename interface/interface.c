@@ -467,7 +467,8 @@ void inf_init(int apps_flag, int total_num, int argc, char **argv){
 		bench_add(NOR,0,-1,total_num);
 	}
 
-	layer_info_mapping(&mp, mp.data_load, argc, argv);	
+	layer_info_mapping(&mp, mp.data_load, argc, argv);
+	mp._data_check_flag=true;
 	if(mp._data_check_flag){
 		__checking_data_init();
 	}
