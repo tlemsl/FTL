@@ -109,6 +109,7 @@ void data_copy_from(uint32_t ppa, char *data){
 		abort();
 	}
 	else{
+		printf("Data Copy Occur %u\n", ppa);
 		memcpy(data, seg_table[ppa].storage, PAGESIZE);
 	}
 }
@@ -121,6 +122,7 @@ void data_copy_to(uint32_t ppa, char *data){
 		printf("cannot write! plz write before erase!\n");
 		abort();
 	}
+	printf("Data Copy Occur %u\n", ppa);
 	memcpy(seg_table[ppa].storage,data,PAGESIZE);
 }
 

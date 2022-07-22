@@ -39,7 +39,6 @@ uint32_t normal_create (lower_info* li,blockmanager *a, algorithm *algo){
 	for(int i=0; i<LOWERTYPE; i++){
 		_cdf[i].min=UINT_MAX;
 	}
-	printf("Segment count %u\n", TOTALSIZE/_PPS);
 	pFTL_init();
 	return 1;
 }
@@ -57,7 +56,7 @@ uint32_t normal_get(request *const req){
 	my_req->end_req=normal_end_req;
 	my_req->param=(void*)params;
 	normal_cnt++;
-	my_req->type=DATAR;
+	
 	switch (req->type){
 	case GCDR:
 		my_req->type=GCDR;
@@ -65,8 +64,11 @@ uint32_t normal_get(request *const req){
 		break;
 	
 	default:
-		//printf("Read Logical : %u physical : %u\n ", req->key, get_key(req->key)>>2);
-		__normal.li->read(get_key(req->key)>>2,PAGESIZE,req->value, my_req);	
+		my_req->type=DATAR;
+		printf("Read Logical : %u physical : %u\n ", req->key, get_key(req->key)>>2);
+		__normal.li->read(get_key(req->key)>>2,PAGESIZE,req->value, my_req);
+		uint8_t offset = get_key(req->key)&(L2PGAP-1);
+		//memcpy(&req->value->value[0], &req->value->value[offset*LPAGESIZE], LPAGESIZE );
 		break;
 	}
 	//__normal.li->read(req->key,PAGESIZE,req->value,req->isAsync, my_req);
@@ -98,13 +100,21 @@ void *normal_end_req(algo_req* input){
 	//bool check=false;
 	//int cnt=0;
 	request *res=input->parents;
-	//printf("call %u\n", res->key);
-	if(res->type != GCDW){
-		free(params);
-	}
-	res->end_req(res);
-
+	printf("call %u\n", res->key);
 	
+	if(res->key == 0){
+		FILE* temp = fopen("readresult.txt", "w");
+		for(int i=0; i<LPAGESIZE;i++){
+                fprintf(temp,"%d\n", ((KEYT*)res->value->value)[i]);
+        }
+		fflush(temp);
+        fclose(temp);
+	}
+	//printf("\n")
+	res->end_req(res);
+	
+
+	free(params);
 	free(input);
 	return NULL;
 }

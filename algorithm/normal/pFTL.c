@@ -91,7 +91,7 @@ void* GC(void* qwer){
                     continue;
                 }
                 write_request->key = lpa;
-                //memcpy((void*)write_request->value, (void*)(read_request->value+(LPAGESIZE*pidx)), 1);
+                memcpy(write_request->value->value, &read_request->value->value[LPAGESIZE*pidx], LPAGESIZE);
                 //pthread_mutex_lock(&GC_lock);
                 write(write_request);
 //                wait_for_request(write_request);
@@ -114,7 +114,7 @@ void* GC(void* qwer){
         free(write_request);
     
     _GC_flag = false;
-//    printf("Done GC!\n");
+    printf("Done GC!\n");
         
 
     }
@@ -136,6 +136,15 @@ void wait_for_request(request* const req){
 void write(request* const req){
     //printf("LOG : %u\n" ,_log);
     //printf("Usable section : %u\n" ,_usable_section);
+    
+    if(req->key == 0){
+        FILE* temp = fopen("write_result1.txt", "w");
+		for(int i=0; i<LPAGESIZE/sizeof(KEYT);i++){
+                fprintf(temp, "%d\n", ((KEYT*)req->value->value)[i]);
+        }
+        fflush(temp);
+        fclose(temp);
+	}
     if(__normal.bm->check_full(_write_segment)) _write_segment = __normal.bm->get_segment(__normal.bm, BLOCK_ACTIVE);
     if(!pftl_buffer.buffer_count) pftl_buffer.ppa = __normal.bm->get_page_addr(_write_segment);
     KEYT lpa = req->key;
@@ -153,9 +162,9 @@ void write(request* const req){
     //printf("%d %d\n", (void*)pftl_buffer.data_set, (void*)pftl_buffer.data_set + LPAGESIZE*pftl_buffer.buffer_count);
     
 	pftl_buffer.lpas[pftl_buffer.buffer_count] = lpa;
-	//memcpy(&pftl_buffer.data_set[LPAGESIZE*pftl_buffer.buffer_count], (void*)req->value->value, LPAGESIZE);
+	memcpy(&pftl_buffer.data_set->value[LPAGESIZE*pftl_buffer.buffer_count], (void*)req->value->value, LPAGESIZE);
 	pftl_buffer.buffer_count++;
-	//printf("Write Logical : %u Physical : %u\n", req->key, ppa>>2);
+	//printf("Write Logical : %u Physical : %u\n", req->key, pftl_buffer.ppa);
 	if(pftl_buffer.buffer_count == L2PGAP){
 		//printf("check\n");
 		normal_params* params=(normal_params*)malloc(sizeof(normal_params));
@@ -169,6 +178,16 @@ void write(request* const req){
         __normal.bm->set_oob(__normal.bm, (char*)pftl_buffer.lpas,
             sizeof(KEYT)*L2PGAP, pftl_buffer.ppa);
         __normal.bm->bit_set(__normal.bm, piece_ppa);
+      
+        if(pftl_buffer.ppa == 0){
+            FILE* temp = fopen("write_result2.txt", "w");
+            for(int i=0; i<LPAGESIZE;i++){
+                fprintf(temp,"%d\n", ((KEYT*)pftl_buffer.data_set->value)[i]);
+            }
+            fflush(temp);
+            fclose(temp);
+        }
+        pftl_buffer.data_set->ppa=pftl_buffer.ppa;
         __normal.li->write(pftl_buffer.ppa,PAGESIZE, pftl_buffer.data_set,my_req);
 		
         pftl_buffer.buffer_count=0;
