@@ -5,7 +5,7 @@
 #include "normal.h"
 #include "../../bench/bench.h"
 #include "pFTL.h"
-#define LOWERTYPE 10
+//#define LOWERTYPE 10
 
 extern MeasureTime mt;
 extern pthread_mutex_t GC_lock;
@@ -55,6 +55,7 @@ uint32_t normal_get(request *const req){
 	my_req->parents=req;
 	my_req->end_req=normal_end_req;
 	my_req->param=(void*)params;
+	req->value = (value_set*)inf_get_valueset(NULL, FS_MALLOC_R, PAGESIZE);
 	normal_cnt++;
 	
 	switch (req->type){
@@ -65,10 +66,9 @@ uint32_t normal_get(request *const req){
 	
 	default:
 		my_req->type=DATAR;
-		printf("Read Logical : %u physical : %u\n ", req->key, get_key(req->key)>>2);
+		my_req->ppa = get_key(req->key);
+		//printf("Read Logical : %u physical : %u\n ", req->key, get_key(req->key)>>2);
 		__normal.li->read(get_key(req->key)>>2,PAGESIZE,req->value, my_req);
-		uint8_t offset = get_key(req->key)&(L2PGAP-1);
-		//memcpy(&req->value->value[0], &req->value->value[offset*LPAGESIZE], LPAGESIZE );
 		break;
 	}
 	//__normal.li->read(req->key,PAGESIZE,req->value,req->isAsync, my_req);
@@ -100,19 +100,15 @@ void *normal_end_req(algo_req* input){
 	//bool check=false;
 	//int cnt=0;
 	request *res=input->parents;
-	printf("call %u\n", res->key);
-	
-	if(res->key == 0){
-		FILE* temp = fopen("readresult.txt", "w");
-		for(int i=0; i<LPAGESIZE;i++){
-                fprintf(temp,"%d\n", ((KEYT*)res->value->value)[i]);
-        }
-		fflush(temp);
-        fclose(temp);
+	if(input->type == DATAR){
+		uint8_t read_offset = input->ppa & (L2PGAP-1);
+		memcpy(&res->value->value[0], &res->value->value[read_offset*LPAGESIZE], LPAGESIZE);	
 	}
-	//printf("\n")
-	res->end_req(res);
+
 	
+	res->end_req(res);
+
+	//if(params->value) printf("chekc2\n");//inf_free_valueset(params->value, FS_MALLOC_W);
 
 	free(params);
 	free(input);

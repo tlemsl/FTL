@@ -4,6 +4,7 @@
 #include "../../include/settings.h"
 typedef struct normal_params{
 	request *parents;
+	value_set* value;
 	bool done;
 }normal_params;
 

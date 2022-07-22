@@ -19,13 +19,14 @@ pthread_mutex_t GC_lock;
 static uint32_t _user_write_reqest, _lower_write_request_cnt;
 static struct mastersegment* _GC_reserve_segment, *_write_segment;
 
+static value_set* write_value;
 
 void pFTL_init(){
     _L2P_table = (KEYT*)malloc(4UL*RANGE);
     
     pftl_buffer.lpas = (KEYT*)malloc(sizeof(KEYT)*L2PGAP);
     pftl_buffer.data_set = (value_set*)inf_get_valueset(NULL,FS_MALLOC_W,PAGESIZE);
-
+    
    
     //printf("%u", _usable_section);
     memset((void*)_L2P_table, 255, 4UL*RANGE);
@@ -53,26 +54,22 @@ void* GC(void* qwer){
         request* read_request = NULL, *write_request = NULL;
         normal_params* read_param = NULL, *write_param;
         read_request = (request*)malloc(sizeof(request));
-        write_request = (request*)malloc(sizeof(request));
+        
         read_param = (normal_params*)malloc(sizeof(normal_params));
-        write_param = (normal_params*)malloc(sizeof(normal_params));
+        
 
         __gsegment* gc_target_section = __normal.bm->get_gc_target(__normal.bm);
         _write_segment = _GC_reserve_segment;
         //printf("GC target : %u empty section : %u \n", gc_target_section/_PPS,empty_section);
         read_param->done = false;
-        write_param->done = false;
+
 
         read_request->value = inf_get_valueset(NULL, FS_MALLOC_R, PAGESIZE);
         read_request->param = (void*)read_param;
         read_request->type = GCDR;
         read_request->end_req = GC_end_req;
 
-        write_request->type = GCDW;
-        write_request->param = (void*)write_param;
-        //write_request->value = (value_set*)malloc(sizeof(value_set));
-        write_request->value = inf_get_valueset(NULL, FS_MALLOC_W, LPAGESIZE);
-        write_request->end_req = GC_end_req;
+        
 
         for(int i=0; i<_PPS; i++){
             KEYT ppa = gc_target_section->seg_idx*_PPS+i;
@@ -90,14 +87,21 @@ void* GC(void* qwer){
                 if(__normal.bm->is_invalid_piece(__normal.bm, piece_ppa)){
                     continue;
                 }
+                write_request = (request*)malloc(sizeof(request));
+                write_param = (normal_params*)malloc(sizeof(normal_params));
+                write_param->done = false;
+                write_request->type = GCDW;
+                write_request->param = (void*)write_param;
+                write_request->end_req = GC_end_req;
                 write_request->key = lpa;
+                write_request->value = inf_get_valueset(NULL, FS_MALLOC_W, PAGESIZE);
                 memcpy(write_request->value->value, &read_request->value->value[LPAGESIZE*pidx], LPAGESIZE);
                 //pthread_mutex_lock(&GC_lock);
                 write(write_request);
 //                wait_for_request(write_request);
                 __normal.bm->bit_unset(__normal.bm, piece_ppa);
                 
-                write_param->done = false;
+                //write_param->done = false;
                 //pthread_mutex_unlock(&GC_lock);
             }
             read_param->done=false;
@@ -107,20 +111,17 @@ void* GC(void* qwer){
         __normal.bm->trim_segment(__normal.bm,gc_target_section);
         __normal.bm->change_reserve_to_active(__normal.bm, _GC_reserve_segment);
         _GC_reserve_segment = __normal.bm->get_segment(__normal.bm, BLOCK_RESERVE);
-
+        inf_free_valueset(read_request->value, FS_MALLOC_R);
         free(read_param);
         free(read_request);
-        free(write_param);
-        free(write_request);
+        //free(write_param);
+        //free(write_request);
     
     _GC_flag = false;
-    printf("Done GC!\n");
+    //printf("Done GC!\n");
         
 
     }
-       
-
-        
     //}
     
 }
@@ -136,15 +137,6 @@ void wait_for_request(request* const req){
 void write(request* const req){
     //printf("LOG : %u\n" ,_log);
     //printf("Usable section : %u\n" ,_usable_section);
-    
-    if(req->key == 0){
-        FILE* temp = fopen("write_result1.txt", "w");
-		for(int i=0; i<LPAGESIZE/sizeof(KEYT);i++){
-                fprintf(temp, "%d\n", ((KEYT*)req->value->value)[i]);
-        }
-        fflush(temp);
-        fclose(temp);
-	}
     if(__normal.bm->check_full(_write_segment)) _write_segment = __normal.bm->get_segment(__normal.bm, BLOCK_ACTIVE);
     if(!pftl_buffer.buffer_count) pftl_buffer.ppa = __normal.bm->get_page_addr(_write_segment);
     KEYT lpa = req->key;
@@ -152,15 +144,8 @@ void write(request* const req){
 	KEYT reserved_ppa = _L2P_table[lpa];
     
     _L2P_table[lpa] = piece_ppa;
-    if(reserved_ppa!=UINT32_MAX){
-        //KEYT garbage_block_section = (u_int32_t)((temp>>2)/_PPS);
-        //printf("section : %u  temp : %u\n", section_n,  _usable_section);
-        if(req->type!=GCDW) __normal.bm->bit_unset(__normal.bm, reserved_ppa);
-        
-    }
-    //printf("%u", sizeof(req->value));
-    //printf("%d %d\n", (void*)pftl_buffer.data_set, (void*)pftl_buffer.data_set + LPAGESIZE*pftl_buffer.buffer_count);
-    
+    if(reserved_ppa!=UINT32_MAX&&req->type!=GCDW) __normal.bm->bit_unset(__normal.bm, reserved_ppa);
+   
 	pftl_buffer.lpas[pftl_buffer.buffer_count] = lpa;
 	memcpy(&pftl_buffer.data_set->value[LPAGESIZE*pftl_buffer.buffer_count], (void*)req->value->value, LPAGESIZE);
 	pftl_buffer.buffer_count++;
@@ -173,22 +158,15 @@ void write(request* const req){
 		my_req->parents=req;
 		my_req->end_req=normal_end_req;
 		my_req->type=DATAW;
+        //my_req->value = inf_get_valueset(NULL, FS_MALLOC_W, PAGESIZE);
         if(req->type == GCDW) my_req->type = GCDW;
 		my_req->param=(void*)params;
         __normal.bm->set_oob(__normal.bm, (char*)pftl_buffer.lpas,
             sizeof(KEYT)*L2PGAP, pftl_buffer.ppa);
         __normal.bm->bit_set(__normal.bm, piece_ppa);
-      
-        if(pftl_buffer.ppa == 0){
-            FILE* temp = fopen("write_result2.txt", "w");
-            for(int i=0; i<LPAGESIZE;i++){
-                fprintf(temp,"%d\n", ((KEYT*)pftl_buffer.data_set->value)[i]);
-            }
-            fflush(temp);
-            fclose(temp);
-        }
-        pftl_buffer.data_set->ppa=pftl_buffer.ppa;
-        __normal.li->write(pftl_buffer.ppa,PAGESIZE, pftl_buffer.data_set,my_req);
+        memcpy(req->value->value, pftl_buffer.data_set->value, PAGESIZE);
+        
+        __normal.li->write(pftl_buffer.ppa,PAGESIZE, req->value,my_req);
 		
         pftl_buffer.buffer_count=0;
 		return;
@@ -206,8 +184,11 @@ bool GC_end_req(request* input){
             params->done = true;
             break;
         case GCDW:
-            params->done = true;
-            //printf("GC end req type %d,\n", input->type);
+            printf("GC end req type %d %u,\n", input->type, input->key);
+            inf_free_valueset(input->value, FS_MALLOC_W);
+            free(input->param);
+            free(input);
+            //params->done = true;
             break;
     }
     //((normal_params*)(input->param))->done = true;
