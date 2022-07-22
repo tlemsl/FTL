@@ -49,30 +49,7 @@ void normal_destroy (lower_info* li, algorithm *algo){
 
 int normal_cnt;
 uint32_t normal_get(request *const req){
-	normal_params* params=(normal_params*)malloc(sizeof(normal_params));
-
-	algo_req *my_req=(algo_req*)malloc(sizeof(algo_req));
-	my_req->parents=req;
-	my_req->end_req=normal_end_req;
-	my_req->param=(void*)params;
-	req->value = (value_set*)inf_get_valueset(NULL, FS_MALLOC_R, PAGESIZE);
-	normal_cnt++;
-	
-	switch (req->type){
-	case GCDR:
-		my_req->type=GCDR;
-		__normal.li->read(req->key,PAGESIZE,req->value, my_req);
-		break;
-	
-	default:
-		my_req->type=DATAR;
-		my_req->ppa = get_key(req->key);
-		//printf("Read Logical : %u physical : %u\n ", req->key, get_key(req->key)>>2);
-		__normal.li->read(get_key(req->key)>>2,PAGESIZE,req->value, my_req);
-		break;
-	}
-	//__normal.li->read(req->key,PAGESIZE,req->value,req->isAsync, my_req);
-	
+	read(req);
 	
 	return 1;
 }

@@ -19,7 +19,7 @@ pthread_mutex_t GC_lock;
 static uint32_t _user_write_reqest, _lower_write_request_cnt;
 static struct mastersegment* _GC_reserve_segment, *_write_segment;
 
-static value_set* write_value;
+static request* last_request;
 
 void pFTL_init(){
     _L2P_table = (KEYT*)malloc(4UL*RANGE);
@@ -42,6 +42,8 @@ void pFTL_init(){
 KEYT get_key(KEYT lpa){
     return _L2P_table[lpa];
 }
+
+
 
 void* GC(void* qwer){
     //printf("initialize GC thread\n");
@@ -142,14 +144,14 @@ void write(request* const req){
     KEYT lpa = req->key;
     KEYT piece_ppa = (pftl_buffer.ppa<<L2P_offset) | pftl_buffer.buffer_count;
 	KEYT reserved_ppa = _L2P_table[lpa];
-    
+    last_request = req;
     _L2P_table[lpa] = piece_ppa;
     if(reserved_ppa!=UINT32_MAX&&req->type!=GCDW) __normal.bm->bit_unset(__normal.bm, reserved_ppa);
    
 	pftl_buffer.lpas[pftl_buffer.buffer_count] = lpa;
 	memcpy(&pftl_buffer.data_set->value[LPAGESIZE*pftl_buffer.buffer_count], (void*)req->value->value, LPAGESIZE);
 	pftl_buffer.buffer_count++;
-	//printf("Write Logical : %u Physical : %u\n", req->key, pftl_buffer.ppa);
+	printf("Write Logical : %u Physical : %u\n", req->key, pftl_buffer.ppa);
 	if(pftl_buffer.buffer_count == L2PGAP){
 		//printf("check\n");
 		normal_params* params=(normal_params*)malloc(sizeof(normal_params));
@@ -176,6 +178,44 @@ void write(request* const req){
     return;
 }
 
+void read(request* const req){
+    normal_params* params=(normal_params*)malloc(sizeof(normal_params));
+
+	algo_req *my_req=(algo_req*)malloc(sizeof(algo_req));
+	my_req->parents=req;
+	my_req->end_req=normal_end_req;
+	my_req->param=(void*)params;
+    my_req->type=DATAR;
+    
+	//req->value = (value_set*)inf_get_valueset(NULL, FS_MALLOC_R, PAGESIZE);
+
+    for(int i=0; i<pftl_buffer.buffer_count; i++){
+        if(pftl_buffer.lpas[i] == req->key){
+            memcpy(req->value->value, &pftl_buffer.data_set->value[i*LPAGESIZE], LPAGESIZE);
+            req->end_req(req);
+            return;
+        }
+    }
+	
+	switch (req->type){
+	case GCDR:
+		my_req->type=GCDR;
+		__normal.li->read(req->key,PAGESIZE,req->value, my_req);
+		break;
+	
+	default:
+		my_req->type=DATAR;
+		my_req->ppa = get_key(req->key);
+		printf("Read Logical : %u physical : %u\n ", req->key, get_key(req->key)>>2);
+		__normal.li->read(get_key(req->key)>>2,PAGESIZE,req->value, my_req);
+		break;
+	}
+	//__normal.li->read(req->key,PAGESIZE,req->value,req->isAsync, my_req);
+	
+	
+	return;
+}
+
 bool GC_end_req(request* input){
     normal_params* params=(normal_params*)input->param;
     switch(input->type){
@@ -184,7 +224,7 @@ bool GC_end_req(request* input){
             params->done = true;
             break;
         case GCDW:
-            printf("GC end req type %d %u,\n", input->type, input->key);
+            //printf("GC end req type %d %u,\n", input->type, input->key);
             inf_free_valueset(input->value, FS_MALLOC_W);
             free(input->param);
             free(input);

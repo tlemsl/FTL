@@ -33,6 +33,8 @@ bool done_GC();
 inline void log_up();
 KEYT get_empty_section();
 void write(request* const req);
+void read(request* const req);
 bool GC_end_req(request* input);
 void wait_for_gc();
+void force_write();
 #endif

@@ -51,7 +51,8 @@ int main(int argc,char* argv[]){
 #else 
 		bench_init();
 		bench_vectored_configure();
-		bench_add(VECTOREDSSET,0,RANGE,RANGE);
+		bench_add(VECTOREDSSET,0,RANGE,RANGE/2);
+	//	bench_add(VECTOREDSSET,0,RANGE,RANGE);
 	//	bench_add(VECTOREDSGET,0,RANGE,RANGE);
 	//	bench_add(VECTOREDRGET,0,RANGE,RANGE);
 		
