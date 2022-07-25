@@ -9,7 +9,7 @@ pftl_buffer_t pftl_buffer;
 
 extern algorithm __normal;
 // Essential Variables
-static KEYT* _L2P_table;
+static u_int64_t* _L2P_table;
 
 static bool _GC_flag;
 pthread_mutex_t GC_lock;
@@ -19,14 +19,14 @@ static struct mastersegment* _GC_reserve_segment, *_write_segment;
 static request* last_request;
 
 void pFTL_init(){
-    _L2P_table = (KEYT*)malloc(4UL*RANGE);
+    _L2P_table = (u_int64_t*)malloc(8UL*RANGE);
     
     pftl_buffer.lpas = (KEYT*)malloc(sizeof(KEYT)*L2PGAP);
     pftl_buffer.data_set = (value_set*)inf_get_valueset(NULL,FS_MALLOC_W,PAGESIZE);
     
    
     //printf("%u", _usable_section);
-    memset((void*)_L2P_table, 255, 4UL*RANGE);
+    memset((void*)_L2P_table, 255, 8UL*RANGE);
     
     //pthread_t GC_thread;
     //pthread_mutex_init(&GC_lock, NULL);
