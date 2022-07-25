@@ -73,7 +73,7 @@ uint32_t normal_remove(request *const req){
 	return 1;
 }
 void *normal_end_req(algo_req* input){
-	normal_params* params=(normal_params*)input->param;
+	//normal_params* params=(normal_params*)input->param;
 	//bool check=false;
 	//int cnt=0;
 	request *res=input->parents;
@@ -87,7 +87,7 @@ void *normal_end_req(algo_req* input){
 
 	//if(params->value) printf("chekc2\n");//inf_free_valueset(params->value, FS_MALLOC_W);
 
-	free(params);
+	//free(params);
 	free(input);
 	return NULL;
 }
