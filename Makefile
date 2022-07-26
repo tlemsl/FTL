@@ -34,8 +34,8 @@ export COMMONFLAGS+=\
 			-DTRACE_REPLAY\
 			-DPROGRESS\
 			-DMAPPING_TIME_CHECK\
-			-O3\
-
+			-O0\
+			-g\
 #			-DLSM_DEBUG\
 #			-DMETAONLY\
 #			-DREAL_BENCH_MODE\
